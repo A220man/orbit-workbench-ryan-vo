@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "name": "orbit-workbench-ryan-vo",
+  "owner": "A220man",
+  "email": "ryandtvo@gmail.com",
+  "domain": "AI/ML developer tools",
+  "summary": "Work in progress: orbit-workbench-ryan-vo",
+  "workflows": [
+    "Editorial diagram synthesis and multi-format SVG rendering",
+    "Hierarchical cloud containment and honest-data rule validation",
+    "AI coding agent visual reasoning benchmark and quality evaluation"
+  ],
+  "auth": "oidc-keycloak-saml-broker",
+  "llm_providers": [
+    "openai-compatible",
+    "anthropic",
+    "gemini",
+    "ollama"
+  ],
+  "status": "work-in-progress"
+}
