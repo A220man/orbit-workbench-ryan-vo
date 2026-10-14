@@ -23,6 +23,21 @@ Implementation: `backend/app/main.py`, `backend/app/api/diagrams.py`, `backend/a
 
 Tests: `backend/tests/test_engine.py`, `backend/tests/test_validator.py`, `backend/tests/test_evaluation.py`, `backend/tests/test_api.py`, `frontend/src/App.test.tsx`
 
+### keycloak-realm-import — Keycloak realm import configuration for OIDC/SAML authentication
+
+Status: done
+
+Acceptance:
+- Keycloak realm `orbit` with client `orbit-frontend` for PKCE SPA flow
+- Hierarchical roles: viewer, analyst, admin with composite inheritance
+- Test users for each role with temporary passwords
+- SAML IdP broker placeholder with attribute mappers for enterprise upstream
+- Docker compose mounts realm file for automatic import on startup
+
+Implementation: `keycloak/realm-orbit.json`, `compose.yaml`
+
+Tests: `backend/tests/test_security.py::test_oidc_pkce_protocol_fixture_and_token_propagation`
+
 ### cloud-containment-grammar-azure — Advanced Azure and AWS multi-tier network topology grammar with automatic routing layout
 
 Status: planned

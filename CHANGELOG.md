@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 — work-in-progress checkpoint
+
+Partial code published for continued development. Known issues: STATUS.md.
+
 ## 1.0.0 — work-in-progress checkpoint
 
 Partial code published for continued development. Known issues: STATUS.md.
@@ -41,6 +45,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Multi-stage Dockerfiles for backend and frontend with non-root security.
   - Local docker-compose configuration including Keycloak and persistent storage.
   - GitHub Actions CI workflow covering pytest, typechecks, frontend tests, and Docker builds on standard ubuntu-latest runners.
+
+### Authored by
+Ryan Vo <ryandtvo@gmail.com>
+## [1.0.1] - 2026-10-14
+
+### Added
+- **Keycloak Realm Import Configuration**:
+  - Complete realm `orbit` with client `orbit-frontend` configured for PKCE and SPA flow.
+  - Hierarchical roles: `viewer` (read-only), `analyst` (create/update diagrams, run evaluations), `admin` (full access).
+  - Test users for each role with temporary passwords requiring reset on first login.
+  - SAML Identity Provider broker placeholder for enterprise upstream IdPs (Okta, Entra ID, PingFederate).
+  - Attribute mappers for SAML assertion claims to Keycloak roles and user profile.
+- **Docker Compose Integration**:
+  - Mounted `keycloak/realm-orbit.json` for automatic realm import on Keycloak startup via `--import-realm`.
+  - Updated healthcheck dependencies for proper service ordering.
+
+### Fixed
+- Keycloak OIDC endpoints now available at container startup for backend authentication integration.
+- Resolved missing realm configuration that prevented SAML brokering setup.
 
 ### Authored by
 Ryan Vo <ryandtvo@gmail.com>
