@@ -7,6 +7,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin_password_change_me
     volumes:
       - keycloak-data:/opt/keycloak/data
+      - ./keycloak/realm-orbit.json:/opt/keycloak/data/import/realm-orbit.json:ro
     ports:
       - "127.0.0.1:8080:8080"
     healthcheck:
