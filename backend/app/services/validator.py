@@ -93,10 +93,20 @@ class DiagramValidator:
     ) -> bool:
         valid = True
 
+        # Support both legacy single VNet and new multi-VNet format
+        vnet_list = data.get("vnets", [])
+        if not vnet_list:
+            # Legacy format
+            vnet_list = [{
+                "name": data.get("vnet", "VNet"),
+                "subnets": data.get("subnets", []),
+                "paas_services": data.get("paas_services", []),
+            }]
+
         # Hierarchy presence
         has_sub = bool(data.get("subscription"))
         has_rg = bool(data.get("resource_group"))
-        has_vnet = bool(data.get("vnet"))
+        has_vnet = len(vnet_list) > 0
 
         if has_sub and has_rg and has_vnet:
             passed_rules.append("containment.cloud_hierarchy_4level")
@@ -110,21 +120,48 @@ class DiagramValidator:
             )
             valid = False
 
-        # Azure Case Study Rule: A PaaS service is NEVER inside a subnet.
-        # It must sit in the resource group; only its private endpoint sits in the subnet.
-        subnets = data.get("subnets", [])
-        for snet in subnets:
-            nodes = snet.get("nodes", [])
-            for n in nodes:
-                node_type = str(n.get("type", "")).lower()
-                node_label = str(n.get("label", "")).lower()
-                if "paas" in node_type or "sql database" in node_label or "storage account" in node_label:
+        # Collect all private endpoint IDs across all VNets for cross-VNet reference validation
+        all_pe_ids = set()
+        for vnet in vnet_list:
+            for snet in vnet.get("subnets", []):
+                for n in snet.get("nodes", []):
+                    if n.get("type") == "private_endpoint" and "id" in n:
+                        all_pe_ids.add(n["id"])
+
+        # Validate each VNet
+        for vnet in vnet_list:
+            subnets = vnet.get("subnets", [])
+            vnet_paas = vnet.get("paas_services", [])
+
+            # Azure Case Study Rule: A PaaS service is NEVER inside a subnet.
+            # It must sit in the resource group; only its private endpoint sits in the subnet.
+            for snet in subnets:
+                nodes = snet.get("nodes", [])
+                for n in nodes:
+                    node_type = str(n.get("type", "")).lower()
+                    node_label = str(n.get("label", "")).lower()
+                    if "paas" in node_type or "sql database" in node_label or "storage account" in node_label:
+                        issues.append(
+                            ValidationIssue(
+                                rule="containment.paas_isolation",
+                                severity="error",
+                                message=f"PaaS violation in VNet '{vnet.get('name')}' subnet '{snet.get('name')}': '{n.get('label')}' cannot be placed directly inside a subnet. Only its private endpoint belongs inside a subnet.",
+                                element_id=n.get("id"),
+                            )
+                        )
+                        valid = False
+
+            # Private Endpoint Linkage Rule:
+            # Every PaaS service must target an existing private endpoint in a subnet (can be in any VNet)
+            for ps in vnet_paas:
+                target_pe = ps.get("target_pe")
+                if target_pe and target_pe not in all_pe_ids:
                     issues.append(
                         ValidationIssue(
-                            rule="containment.paas_isolation",
+                            rule="containment.private_endpoint_linkage",
                             severity="error",
-                            message=f"PaaS violation in '{snet.get('name')}': '{n.get('label')}' cannot be placed directly inside a subnet. Only its private endpoint belongs inside a subnet.",
-                            element_id=n.get("id"),
+                            message=f"PaaS service '{ps.get('label')}' in VNet '{vnet.get('name')}' references non-existent private endpoint target '{target_pe}'.",
+                            element_id=ps.get("id"),
                         )
                     )
                     valid = False
@@ -132,30 +169,48 @@ class DiagramValidator:
         if "containment.paas_isolation" not in [i.rule for i in issues]:
             passed_rules.append("containment.paas_isolation")
 
-        # Private Endpoint Linkage Rule:
-        # Every PaaS service must target an existing private endpoint in a subnet
-        pe_node_ids = set()
-        for snet in subnets:
-            for n in snet.get("nodes", []):
-                if n.get("type") == "private_endpoint" and "id" in n:
-                    pe_node_ids.add(n["id"])
+        if "containment.private_endpoint_linkage" not in [i.rule for i in issues]:
+            passed_rules.append("containment.private_endpoint_linkage")
 
-        paas_services = data.get("paas_services", [])
-        for ps in paas_services:
-            target_pe = ps.get("target_pe")
-            if target_pe and target_pe not in pe_node_ids:
+        # Peering validation
+        peerings = data.get("peerings", [])
+        vnet_names = {v.get("name") for v in vnet_list}
+        for peering in peerings:
+            src = peering.get("source_vnet")
+            dst = peering.get("target_vnet")
+            if src not in vnet_names:
                 issues.append(
                     ValidationIssue(
-                        rule="containment.private_endpoint_linkage",
+                        rule="containment.peering_invalid_source",
                         severity="error",
-                        message=f"PaaS service '{ps.get('label')}' references non-existent private endpoint target '{target_pe}'.",
-                        element_id=ps.get("id"),
+                        message=f"Peering references non-existent source VNet '{src}'.",
+                        element_id=f"peering-{src}-{dst}",
+                    )
+                )
+                valid = False
+            if dst not in vnet_names:
+                issues.append(
+                    ValidationIssue(
+                        rule="containment.peering_invalid_target",
+                        severity="error",
+                        message=f"Peering references non-existent target VNet '{dst}'.",
+                        element_id=f"peering-{src}-{dst}",
+                    )
+                )
+                valid = False
+            if src == dst:
+                issues.append(
+                    ValidationIssue(
+                        rule="containment.peering_self_reference",
+                        severity="error",
+                        message="Peering cannot reference the same VNet as both source and target.",
+                        element_id=f"peering-{src}-{dst}",
                     )
                 )
                 valid = False
 
-        if "containment.private_endpoint_linkage" not in [i.rule for i in issues]:
-            passed_rules.append("containment.private_endpoint_linkage")
+        if peerings and "containment.peering_invalid_source" not in [i.rule for i in issues]:
+            passed_rules.append("containment.peering_valid")
 
         return valid
 

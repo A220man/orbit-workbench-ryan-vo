@@ -79,3 +79,108 @@ def test_honest_data_sankey_unbalanced_warning():
     report = DiagramValidator.validate("sankey", content)
     # Should flag a warning for mass conservation
     assert any(i.rule == "honest_data.sankey_conservation_of_mass" for i in report.issues)
+
+
+def test_cloud_containment_multi_vnet_valid():
+    """Test multi-VNet architecture with peering passes validation."""
+    valid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {
+                "name": "vnet-hub",
+                "subnets": [
+                    {"name": "snet-gateway", "nodes": [{"id": "fw", "label": "Firewall", "type": "compute", "ip": "10.0.0.4"}]},
+                ],
+            },
+            {
+                "name": "vnet-spoke1",
+                "subnets": [
+                    {"name": "snet-app", "nodes": [{"id": "pe-1", "label": "pe-sql", "type": "private_endpoint", "ip": "10.1.1.5"}]},
+                ],
+                "paas_services": [
+                    {"id": "sql-db", "label": "Azure SQL Managed", "target_pe": "pe-1", "tier": "vCore"}
+                ],
+            },
+        ],
+        "peerings": [
+            {"source_vnet": "vnet-hub", "target_vnet": "vnet-spoke1"},
+        ],
+    }
+    content = DiagramContent(title="Valid Multi-VNet Architecture", data=valid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert report.containment_compliant
+    assert report.valid
+    assert any("peering_valid" in r for r in report.passed_rules)
+
+
+def test_cloud_containment_multi_vnet_invalid_peering():
+    """Test peering to non-existent VNet fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": []},
+        ],
+        "peerings": [
+            {"source_vnet": "vnet-hub", "target_vnet": "vnet-nonexistent"},
+        ],
+    }
+    content = DiagramContent(title="Invalid Peering", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert any(i.rule == "containment.peering_invalid_target" for i in report.issues)
+
+
+def test_cloud_containment_multi_vnet_self_peering():
+    """Test self-referencing peering fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": []},
+        ],
+        "peerings": [
+            {"source_vnet": "vnet-hub", "target_vnet": "vnet-hub"},
+        ],
+    }
+    content = DiagramContent(title="Self Peering", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert any(i.rule == "containment.peering_self_reference" for i in report.issues)
+
+
+def test_cloud_containment_multi_vnet_cross_vnet_pe_linkage():
+    """Test PaaS in one VNet can reference PE in another VNet."""
+    valid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {
+                "name": "vnet-hub",
+                "subnets": [],
+            },
+            {
+                "name": "vnet-spoke",
+                "subnets": [
+                    {"name": "snet-data", "nodes": [{"id": "pe-1", "label": "pe-sql", "type": "private_endpoint", "ip": "10.1.1.5"}]},
+                ],
+            },
+            {
+                "name": "vnet-app",
+                "subnets": [],
+                "paas_services": [
+                    {"id": "sql-db", "label": "Azure SQL", "target_pe": "pe-1", "tier": "vCore"}
+                ],
+            },
+        ],
+        "peerings": [
+            {"source_vnet": "vnet-hub", "target_vnet": "vnet-spoke"},
+            {"source_vnet": "vnet-hub", "target_vnet": "vnet-app"},
+        ],
+    }
+    content = DiagramContent(title="Cross-VNet PE Linkage", data=valid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert report.containment_compliant
+    assert report.valid
+    assert any("private_endpoint_linkage" in r for r in report.passed_rules)

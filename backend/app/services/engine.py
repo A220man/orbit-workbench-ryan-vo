@@ -109,75 +109,179 @@ body {{ margin: 0; padding: 24px; background: var(--bg); color: var(--ink); font
 
     def _render_architecture(self, content: DiagramContent, is_azure: bool = True) -> Tuple[str, int]:
         t = self.theme
-        w, h = 980, 560
+        w, h = 1120, 640
         elems = 0
         pname = "AZURE" if is_azure else "AWS"
         d = content.data
 
         sub_t = d.get("subscription", "Production Subscription")
         rg_t = d.get("resource_group", "Core Infrastructure RG")
-        vnet_t = d.get("vnet", "Hub VNet [10.200.0.0/16]")
-        subnets = d.get("subnets", [{"name": "snet-compute", "nodes": [{"id": "vm1", "label": "Worker", "type": "compute", "ip": "10.200.1.4"}]}])
+
+        # Support both legacy single VNet and new multi-VNet format
+        vnet_list = d.get("vnets", [])
+        if not vnet_list:
+            # Backward compatibility: wrap legacy single VNet
+            vnet_list = [{
+                "name": d.get("vnet", "Hub VNet [10.200.0.0/16]"),
+                "subnets": d.get("subnets", [{"name": "snet-compute", "nodes": [{"id": "vm1", "label": "Worker", "type": "compute", "ip": "10.200.1.4"}]}]),
+                "peers": []
+            }]
+
         paas = d.get("paas_services", [{"id": "db", "label": "Azure SQL", "tier": "vCore"}])
+        peerings = d.get("peerings", [])
 
         p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="100%" height="auto">',
              self._rect(0, 0, w, h, t["bg"]),
              self._rect(20, 20, w - 40, h - 40, t["zone_l0"], t["border"], 6),
-             self._text(36, 44, f"{pname} TENANT / {sub_t}", t["accent"], 11, 600, True)]
-        elems += 4
+             self._text(36, 44, f"{pname} TENANT / {sub_t}", t["accent"], 11, 600, True),
+             self._text(36, 58, rg_t, t["ink"], 11, 400, True)]
+        elems += 5
 
+        # Resource group area
         rg_w, rg_h = w - 80, h - 90
-        p += [self._rect(40, 58, rg_w, rg_h, t["zone_l1"], t["border"], 4),
-              self._text(56, 80, rg_t, t["ink"], 11, 600, True)]
-        elems += 2
+        p += [self._rect(40, 72, rg_w, rg_h, t["zone_l1"], t["border"], 4)]
+        elems += 1
 
-        vnet_w, vnet_h = rg_w - 240, rg_h - 40
-        p += [self._rect(56, 90, vnet_w, vnet_h, t["zone_l2"], t["border_dark"], 4, 'stroke-dasharray="4,2"'),
-              self._text(72, 112, vnet_t, t["accent"], 11, 600, True)]
-        elems += 2
+        # Multi-VNet layout with orthogonal sibling routing
+        # Sibling VNets run on perpendicular axes: first horizontal, second vertical, alternating
+        num_vnets = len(vnet_list)
+        vnet_positions = []  # List of (vnet_x, vnet_y, vnet_w, vnet_h, vnet_data)
 
-        snet_y = 126
-        snet_h = (vnet_h - 60) // max(len(subnets), 1)
-        pe_pos: Dict[str, Tuple[int, int]] = {}
+        if num_vnets == 1:
+            # Single VNet: centered
+            vnet_w, vnet_h = rg_w - 80, rg_h - 60
+            vnet_x, vnet_y = 60, 90
+            vnet_positions.append((vnet_x, vnet_y, vnet_w, vnet_h, vnet_list[0]))
+        elif num_vnets == 2:
+            # Two sibling VNets: side by side horizontally (perpendicular to subnet vertical flow)
+            vnet_w = (rg_w - 100) // 2
+            vnet_h = rg_h - 60
+            vnet_positions.append((60, 90, vnet_w, vnet_h, vnet_list[0]))
+            vnet_positions.append((70 + vnet_w, 90, vnet_w, vnet_h, vnet_list[1]))
+        elif num_vnets == 3:
+            # Three VNets: two horizontal, one below (hub-spoke pattern)
+            vnet_w = (rg_w - 100) // 2
+            vnet_h = (rg_h - 100) // 2
+            vnet_positions.append((60, 90, vnet_w, vnet_h, vnet_list[0]))  # Hub left
+            vnet_positions.append((70 + vnet_w, 90, vnet_w, vnet_h, vnet_list[1]))  # Hub right
+            vnet_positions.append((60, 100 + vnet_h, rg_w - 80, vnet_h, vnet_list[2]))  # Spoke below spanning both
+        else:
+            # 4+: grid layout, alternating axis per row
+            cols = 2
+            rows = (num_vnets + 1) // 2
+            vnet_w = (rg_w - 100) // cols
+            vnet_h = (rg_h - 100) // rows
+            for i, vnet in enumerate(vnet_list):
+                row = i // cols
+                col = i % cols
+                vnet_positions.append((60 + col * (vnet_w + 20), 90 + row * (vnet_h + 20), vnet_w, vnet_h, vnet))
 
-        for i, snet in enumerate(subnets):
-            cy = snet_y + (i * (snet_h + 12))
-            sw = vnet_w - 32
-            p += [self._rect(72, cy, sw, snet_h, t["zone_l3"], t["border"], 3),
-                  self._text(86, cy + 20, snet.get("name", "Subnet"), t["ink_muted"], 10, 600, True)]
+        # Store VNet center points for peering connections
+        vnet_centers = {}  # name -> (cx, cy)
+
+        # Render each VNet
+        for vnet_x, vnet_y, vnet_w, vnet_h, vnet in vnet_positions:
+            vnet_name = vnet.get("name", "VNet")
+            subnets = vnet.get("subnets", [])
+
+            # VNet boundary (dashed stroke)
+            p += [self._rect(vnet_x, vnet_y, vnet_w, vnet_h, t["zone_l2"], t["border_dark"], 4, 'stroke-dasharray="4,2"'),
+                  self._text(vnet_x + 16, vnet_y + 22, vnet_name, t["accent"], 11, 600, True)]
             elems += 2
 
-            nx = 86
-            for n in snet.get("nodes", []):
-                nw, nh, ny = 260, 48, cy + 32
-                is_pe = n.get("type") == "private_endpoint"
-                sc = t["accent"] if is_pe else t["border"]
-                fc = t["accent_bg"] if is_pe else t["surface"]
-                p += [self._rect(nx, ny, nw, nh, fc, sc, 3, f'data-azure-node="{n.get("id")}"'),
-                      self._text(nx + 12, ny + 20, n.get("label", ""), t["ink"], 11, 600),
-                      self._text(nx + 12, ny + 36, n.get("ip", ""), t["ink_faint"], 9.5, 400, True)]
-                elems += 3
-                if is_pe and "id" in n:
-                    pe_pos[n["id"]] = (nx + nw, ny + (nh // 2))
-                nx += nw + 20
+            vnet_centers[vnet_name] = (vnet_x + vnet_w // 2, vnet_y + vnet_h // 2)
 
-        px, py = w - 260, 126
-        for ps in paas:
-            pw, ph = 190, 80
-            p += [self._rect(px, py, pw, ph, t["surface"], t["accent"], 4, f'data-azure-paas="{ps.get("id")}"'),
-                  self._text(px + 14, py + 24, "PAAS SERVICE", t["accent"], 10, 600, True),
-                  self._text(px + 14, py + 46, ps.get("label", ""), t["ink"], 11, 600),
-                  self._text(px + 14, py + 64, ps.get("tier", ""), t["ink_muted"], 9.5, 400, True)]
-            elems += 4
+            # Subnets - vertical stack within VNet
+            snet_y = vnet_y + 36
+            snet_h = (vnet_h - 60) // max(len(subnets), 1)
+            pe_pos: Dict[str, Tuple[int, int]] = {}
 
-            pe_tgt = ps.get("target_pe")
-            if pe_tgt and pe_tgt in pe_pos:
-                tx, ty = pe_pos[pe_tgt]
-                p += [f'<path d="M {tx} {ty} C {tx+50} {ty}, {px-40} {py+40}, {px} {py+40}" fill="none" stroke="{t["accent"]}" stroke-width="1.5" stroke-dasharray="3,3"/>',
-                      f'<circle cx="{tx}" cy="{ty}" r="3" fill="{t["accent"]}"/>',
-                      f'<circle cx="{px}" cy="{py+40}" r="3" fill="{t["accent"]}"/>']
-                elems += 3
-            py += ph + 24
+            for i, snet in enumerate(subnets):
+                cy = snet_y + (i * (snet_h + 10))
+                sw = vnet_w - 32
+                p += [self._rect(vnet_x + 16, cy, sw, snet_h, t["zone_l3"], t["border"], 3),
+                      self._text(vnet_x + 30, cy + 18, snet.get("name", "Subnet"), t["ink_muted"], 10, 600, True)]
+                elems += 2
+
+                nx = vnet_x + 30
+                for n in snet.get("nodes", []):
+                    nw, nh, ny = 260, 48, cy + 28
+                    is_pe = n.get("type") == "private_endpoint"
+                    sc = t["accent"] if is_pe else t["border"]
+                    fc = t["accent_bg"] if is_pe else t["surface"]
+                    node_id = f'{vnet_name}/{snet.get("name")}/{n.get("id")}'
+                    p += [self._rect(nx, ny, nw, nh, fc, sc, 3, f'data-azure-node="{node_id}"'),
+                          self._text(nx + 12, ny + 20, n.get("label", ""), t["ink"], 11, 600),
+                          self._text(nx + 12, ny + 36, n.get("ip", ""), t["ink_faint"], 9.5, 400, True)]
+                    elems += 3
+                    if is_pe and "id" in n:
+                        pe_pos[n["id"]] = (nx + nw, ny + (nh // 2))
+                    nx += nw + 20
+
+            # PaaS services for this VNet (placed to the right)
+            vnet_paas = vnet.get("paas_services", paas if vnet == vnet_list[0] else [])
+            px, py = vnet_x + vnet_w + 20, vnet_y + 36
+            for ps in vnet_paas:
+                pw, ph = 180, 70
+                paas_id = f'{vnet_name}/{ps.get("id")}'
+                p += [self._rect(px, py, pw, ph, t["surface"], t["accent"], 4, f'data-azure-paas="{paas_id}"'),
+                      self._text(px + 12, py + 18, "PAAS SERVICE", t["accent"], 9, 600, True),
+                      self._text(px + 12, py + 36, ps.get("label", ""), t["ink"], 11, 600),
+                      self._text(px + 12, py + 52, ps.get("tier", ""), t["ink_muted"], 9, 400, True)]
+                elems += 4
+
+                pe_tgt = ps.get("target_pe")
+                if pe_tgt and pe_tgt in pe_pos:
+                    tx, ty = pe_pos[pe_tgt]
+                    p += [f'<path d="M {tx} {ty} C {tx+40} {ty}, {px-30} {py+35}, {px} {py+35}" fill="none" stroke="{t["accent"]}" stroke-width="1.5" stroke-dasharray="3,3" data-azure-pe-connection="true"/>',
+                          f'<circle cx="{tx}" cy="{ty}" r="3" fill="{t["accent"]}"/>',
+                          f'<circle cx="{px}" cy="{py+35}" r="3" fill="{t["accent"]}"/>']
+                    elems += 3
+                py += ph + 20
+
+        # Render peering connections between VNets (orthogonal routing)
+        for peering in peerings:
+            src = peering.get("source_vnet")
+            dst = peering.get("target_vnet")
+            if src in vnet_centers and dst in vnet_centers:
+                sx, sy = vnet_centers[src]
+                dx, dy = vnet_centers[dst]
+
+                # Determine routing axis based on relative positions (orthogonal)
+                # Sibling VNets horizontally aligned -> route vertically then horizontally
+                # Hub-spoke vertically aligned -> route horizontally then vertically
+                if abs(sy - dy) < 50:  # Same row (sibling VNets)
+                    # Vertical detour then horizontal
+                    mid_y = min(sy, dy) - 60
+                    path = f'M {sx} {sy} V {mid_y} H {dx} V {dy}'
+                else:  # Different rows (hub-spoke)
+                    # Horizontal detour then vertical
+                    mid_x = max(sx, dx) + 80
+                    path = f'M {sx} {sy} H {mid_x} V {dy} H {dx}'
+
+                p += [f'<path d="{path}" fill="none" stroke="{t["accent"]}" stroke-width="2" stroke-dasharray="6,4" data-azure-peering="{src}-{dst}" data-azure-peering-type="vnet-peering"/>']
+                elems += 1
+
+                # Peering label at midpoint
+                mx, my = (sx + dx) // 2, (sy + dy) // 2
+                p += [self._text(mx, my - 12, "VNet Peering", t["accent"], 9, 600, True, "middle")]
+                elems += 1
+
+        # Global PaaS services (legacy, outside any specific VNet)
+        if num_vnets == 1:
+            # Only render global PaaS if using legacy single VNet mode
+            px, py = w - 250, 100
+            for ps in paas:
+                pw, ph = 180, 70
+                p += [self._rect(px, py, pw, ph, t["surface"], t["accent"], 4, f'data-azure-paas="{ps.get("id")}"'),
+                      self._text(px + 12, py + 18, "PAAS SERVICE", t["accent"], 9, 600, True),
+                      self._text(px + 12, py + 36, ps.get("label", ""), t["ink"], 11, 600),
+                      self._text(px + 12, py + 52, ps.get("tier", ""), t["ink_muted"], 9, 400, True)]
+                elems += 4
+
+                pe_tgt = ps.get("target_pe")
+                # Note: in multi-VNet mode, PEs are resolved within each VNet
+                py += ph + 20
 
         p.append("</svg>")
         return "\n".join(p), elems
