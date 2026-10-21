@@ -4,7 +4,7 @@ Each round completes one feature or repair. Future items are planned, not implem
 
 ## Current round
 
-diagram-design-workbench
+cloud-containment-grammar-azure
 
 ## Roadmap
 
@@ -19,46 +19,19 @@ Acceptance:
 - OIDC bearer authentication with demo mode and role-based access control enforces endpoint security
 - Interactive React UI provides diagram editor, live preview, validation inspector, benchmark runner, and artifact export workflows
 
-Implementation: `backend/app/main.py`, `backend/app/api/diagrams.py`, `backend/app/services/engine.py`, `backend/app/services/validator.py`, `backend/app/services/evaluator.py`, `frontend/src/App.tsx`
+Implementation: `backend/app/services/engine.py`, `backend/app/services/validator.py`, `backend/app/services/evaluator.py`, `backend/app/api/diagrams.py`, `backend/app/api/evaluation.py`, `backend/app/api/auth.py`, `backend/app/api/audit.py`, `backend/app/main.py`, `frontend/src/App.tsx`
 
 Tests: `backend/tests/test_engine.py`, `backend/tests/test_validator.py`, `backend/tests/test_evaluation.py`, `backend/tests/test_api.py`, `frontend/src/App.test.tsx`
 
-### keycloak-realm-import — Keycloak realm import configuration for OIDC/SAML authentication
-
-Status: done
-
-Acceptance:
-- Keycloak realm `orbit` with client `orbit-frontend` for PKCE SPA flow
-- Hierarchical roles: viewer, analyst, admin with composite inheritance
-- Test users for each role with temporary passwords
-- SAML IdP broker placeholder with attribute mappers for enterprise upstream
-- Docker compose mounts realm file for automatic import on startup
-
-Implementation: `keycloak/realm-orbit.json`, `compose.yaml`
-
-Tests: `backend/tests/test_security.py::test_oidc_pkce_protocol_fixture_and_token_propagation`
-
 ### cloud-containment-grammar-azure — Advanced Azure and AWS multi-tier network topology grammar with automatic routing layout
 
-Status: planned
+Status: in_progress
 
 Acceptance:
 - Automatic orthogonal routing between sibling VNets and transitive hub-spoke peering connections
 - Data-attribute validation for NSG flow rules and route tables
 
-### sbgn-systems-biology-notation — Extended SBGN Process Description glyphs and SBML biological network importer
+Implementation: `backend/app/services/engine.py`, `backend/app/services/validator.py`
 
-Status: planned
-
-Acceptance:
-- Import SBML XML files directly into Orbit declarative diagram specs
-- Render reversible reaction nodes, catalytic effectors, and logic operators
-
-### multi-tenant-saml-federation — Enterprise multi-tenant Keycloak SAML IdP broker automated realm sync
-
-Status: planned
-
-Acceptance:
-- Automated SAML assertion attribute mapping for organization-level diagram libraries
-- SCIM group synchronization for engineering and security team roles
+Tests: `backend/tests/test_engine.py`, `backend/tests/test_validator.py`
 
