@@ -1,9 +1,36 @@
 # Changelog
 
+## 1.3.0 — work-in-progress checkpoint
+
+Partial code published for continued development. Known issues: STATUS.md.
+
 ## 1.2.0 — work-in-progress checkpoint
 
 Partial code published for continued development. Known issues: STATUS.md.
 
+## [1.2.1] - 2026-10-24
+
+### Added
+- **Advanced Cloud Containment Grammar — NSG Flow Rules & Route Tables**:
+  - NSG (Network Security Group) flow rule validation with data attributes for machine verification.
+  - Validates rule priority (100-4096), direction (Inbound/Outbound), access (Allow/Deny), protocol (Tcp/Udp/Icmp/*).
+  - Ensures NSG rules reference existing subnets and contain all required fields.
+  - Route table validation with address prefix, next hop type validation (VirtualAppliance, VirtualNetworkGateway, VnetLocal, Internet, None).
+  - Default route (0.0.0.0/0) requirement warning with valid next hop types.
+  - Data-azure attributes rendered for NSG (`data-azure-nsg`) and route table (`data-azure-route-table`) indicators in SVG output.
+- **Orthogonal Peering Routing**:
+  - Automatic orthogonal routing between sibling VNets (vertical detour then horizontal).
+  - Hub-spoke peering routing (horizontal detour then vertical).
+  - Data attributes for peering connections (`data-azure-peering`, `data-azure-peering-type`).
+
+### Fixed
+- Self-referencing VNet peering now correctly fails containment validation.
+
+### Authored by
+Ryan Vo <ryandtvo@gmail.com>
+
+
+## 1.2.0 — work-in-progress checkpoint
 ## 1.1.0 — work-in-progress checkpoint
 
 Partial code published for continued development. Known issues: STATUS.md.

@@ -208,9 +208,173 @@ class DiagramValidator:
                     )
                 )
                 valid = False
-
-        if peerings and "containment.peering_invalid_source" not in [i.rule for i in issues]:
+        peering_errors = {"containment.peering_invalid_source", "containment.peering_invalid_target", "containment.peering_self_reference"}
+        if peerings and not any(i.rule in peering_errors for i in issues):
             passed_rules.append("containment.peering_valid")
+
+        # NSG Flow Rules Validation
+        nsg_rules = data.get("nsg_rules", {})
+        # nsg_rules is a dict: subnet_ref -> list of rules
+        # Each rule: {name, priority, direction, access, protocol, source_port_range, destination_port_range, source_address_prefix, destination_address_prefix}
+        all_subnet_refs = set()
+        for vnet in vnet_list:
+            for snet in vnet.get("subnets", []):
+                vnet_name = vnet.get("name", "")
+                snet_name = snet.get("name", "")
+                if vnet_name and snet_name:
+                    all_subnet_refs.add(f"{vnet_name}/{snet_name}")
+
+        for subnet_ref, rules in nsg_rules.items():
+            if subnet_ref not in all_subnet_refs:
+                issues.append(
+                    ValidationIssue(
+                        rule="containment.nsg_invalid_subnet_reference",
+                        severity="error",
+                        message=f"NSG rules reference non-existent subnet '{subnet_ref}'.",
+                        element_id=f"nsg-{subnet_ref}",
+                    )
+                )
+                valid = False
+                continue
+
+            for rule in rules:
+                # Validate required fields
+                required_fields = ["name", "priority", "direction", "access", "protocol"]
+                for field in required_fields:
+                    if field not in rule:
+                        issues.append(
+                            ValidationIssue(
+                                rule="containment.nsg_missing_field",
+                                severity="error",
+                                message=f"NSG rule '{rule.get('name', 'unknown')}' in subnet '{subnet_ref}' is missing required field: {field}.",
+                                element_id=f"nsg-{subnet_ref}-{rule.get('name', 'unknown')}",
+                            )
+                        )
+                        valid = False
+
+                # Validate priority range (100-4096)
+                priority = rule.get("priority", 0)
+                if not (100 <= priority <= 4096):
+                    issues.append(
+                        ValidationIssue(
+                            rule="containment.nsg_invalid_priority",
+                            severity="error",
+                            message=f"NSG rule '{rule.get('name')}' in subnet '{subnet_ref}' has invalid priority {priority}. Must be 100-4096.",
+                            element_id=f"nsg-{subnet_ref}-{rule.get('name')}",
+                        )
+                    )
+                    valid = False
+
+                # Validate direction
+                if rule.get("direction") not in ("Inbound", "Outbound"):
+                    issues.append(
+                        ValidationIssue(
+                            rule="containment.nsg_invalid_direction",
+                            severity="error",
+                            message=f"NSG rule '{rule.get('name')}' in subnet '{subnet_ref}' has invalid direction. Must be 'Inbound' or 'Outbound'.",
+                            element_id=f"nsg-{subnet_ref}-{rule.get('name')}",
+                        )
+                    )
+                    valid = False
+
+                # Validate access
+                if rule.get("access") not in ("Allow", "Deny"):
+                    issues.append(
+                        ValidationIssue(
+                            rule="containment.nsg_invalid_access",
+                            severity="error",
+                            message=f"NSG rule '{rule.get('name')}' in subnet '{subnet_ref}' has invalid access. Must be 'Allow' or 'Deny'.",
+                            element_id=f"nsg-{subnet_ref}-{rule.get('name')}",
+                        )
+                    )
+                    valid = False
+
+                # Validate protocol
+                if rule.get("protocol") not in ("Tcp", "Udp", "Icmp", "*"):
+                    issues.append(
+                        ValidationIssue(
+                            rule="containment.nsg_invalid_protocol",
+                            severity="error",
+                            message=f"NSG rule '{rule.get('name')}' in subnet '{subnet_ref}' has invalid protocol. Must be 'Tcp', 'Udp', 'Icmp', or '*'.",
+                            element_id=f"nsg-{subnet_ref}-{rule.get('name')}",
+                        )
+                    )
+                    valid = False
+
+        if nsg_rules and "containment.nsg_invalid_subnet_reference" not in [i.rule for i in issues]:
+            passed_rules.append("containment.nsg_rules_valid")
+
+        # Route Table Validation
+        route_tables = data.get("route_tables", {})
+        # route_tables is a dict: subnet_ref -> list of routes
+        # Each route: {name, address_prefix, next_hop_type, next_hop_ip (optional)}
+
+        for subnet_ref, routes in route_tables.items():
+            if subnet_ref not in all_subnet_refs:
+                issues.append(
+                    ValidationIssue(
+                        rule="containment.route_table_invalid_subnet_reference",
+                        severity="error",
+                        message=f"Route table references non-existent subnet '{subnet_ref}'.",
+                        element_id=f"rt-{subnet_ref}",
+                    )
+                )
+                valid = False
+                continue
+
+            has_default_route = False
+            for route in routes:
+                required_fields = ["name", "address_prefix", "next_hop_type"]
+                for field in required_fields:
+                    if field not in route:
+                        issues.append(
+                            ValidationIssue(
+                                rule="containment.route_table_missing_field",
+                                severity="error",
+                                message=f"Route '{route.get('name', 'unknown')}' in subnet '{subnet_ref}' is missing required field: {field}.",
+                                element_id=f"rt-{subnet_ref}-{route.get('name', 'unknown')}",
+                            )
+                        )
+                        valid = False
+
+                if route.get("address_prefix") == "0.0.0.0/0":
+                    has_default_route = True
+                    if route.get("next_hop_type") not in ("Internet", "VirtualAppliance", "VirtualNetworkGateway", "VnetLocal", "None"):
+                        issues.append(
+                            ValidationIssue(
+                                rule="containment.route_table_invalid_default_next_hop",
+                                severity="error",
+                                message=f"Default route (0.0.0.0/0) in subnet '{subnet_ref}' has invalid next_hop_type '{route.get('next_hop_type')}'.",
+                                element_id=f"rt-{subnet_ref}-{route.get('name')}",
+                            )
+                        )
+                        valid = False
+
+                valid_next_hop_types = ("VirtualAppliance", "VirtualNetworkGateway", "VnetLocal", "Internet", "None")
+                if route.get("next_hop_type") not in valid_next_hop_types:
+                    issues.append(
+                        ValidationIssue(
+                            rule="containment.route_table_invalid_next_hop_type",
+                            severity="error",
+                            message=f"Route '{route.get('name')}' in subnet '{subnet_ref}' has invalid next_hop_type '{route.get('next_hop_type')}'.",
+                            element_id=f"rt-{subnet_ref}-{route.get('name')}",
+                        )
+                    )
+                    valid = False
+
+            # Warn if no default route (0.0.0.0/0) to Internet or VirtualAppliance
+            if routes and not has_default_route:
+                issues.append(
+                    ValidationIssue(
+                        rule="containment.route_table_missing_default_route",
+                        severity="warning",
+                        message=f"Route table for subnet '{subnet_ref}' has no default route (0.0.0.0/0) to Internet or VirtualAppliance.",
+                        element_id=f"rt-{subnet_ref}",
+                    )
+                )
+
+        if route_tables and "containment.route_table_invalid_subnet_reference" not in [i.rule for i in issues]:
+            passed_rules.append("containment.route_tables_valid")
 
         return valid
 

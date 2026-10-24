@@ -184,3 +184,264 @@ def test_cloud_containment_multi_vnet_cross_vnet_pe_linkage():
     assert report.containment_compliant
     assert report.valid
     assert any("private_endpoint_linkage" in r for r in report.passed_rules)
+
+
+def test_cloud_containment_nsg_valid_rules():
+    """Test valid NSG flow rules pass validation."""
+    valid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {
+                "name": "vnet-hub",
+                "subnets": [
+                    {"name": "snet-gateway", "nodes": [{"id": "fw", "label": "Firewall", "type": "compute", "ip": "10.0.0.4"}]},
+                ],
+            },
+        ],
+        "nsg_rules": {
+            "vnet-hub/snet-gateway": [
+                {
+                    "name": "AllowInboundHTTPS",
+                    "priority": 100,
+                    "direction": "Inbound",
+                    "access": "Allow",
+                    "protocol": "Tcp",
+                    "source_port_range": "*",
+                    "destination_port_range": "443",
+                    "source_address_prefix": "*",
+                    "destination_address_prefix": "*",
+                },
+                {
+                    "name": "DenyInboundSSH",
+                    "priority": 200,
+                    "direction": "Inbound",
+                    "access": "Deny",
+                    "protocol": "Tcp",
+                    "source_port_range": "*",
+                    "destination_port_range": "22",
+                    "source_address_prefix": "*",
+                    "destination_address_prefix": "*",
+                },
+            ],
+        },
+    }
+    content = DiagramContent(title="Valid NSG Rules", data=valid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert report.containment_compliant
+    assert report.valid
+    assert any("nsg_rules_valid" in r for r in report.passed_rules)
+
+
+def test_cloud_containment_nsg_invalid_subnet_reference():
+    """Test NSG rules referencing non-existent subnet fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": []},
+        ],
+        "nsg_rules": {
+            "vnet-hub/non-existent": [
+                {"name": "TestRule", "priority": 100, "direction": "Inbound", "access": "Allow", "protocol": "Tcp"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid NSG Subnet", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.nsg_invalid_subnet_reference" for i in report.issues)
+
+
+def test_cloud_containment_nsg_invalid_priority():
+    """Test NSG rule with invalid priority fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "nsg_rules": {
+            "vnet-hub/snet-gateway": [
+                {"name": "BadPriority", "priority": 50, "direction": "Inbound", "access": "Allow", "protocol": "Tcp"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid NSG Priority", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.nsg_invalid_priority" for i in report.issues)
+
+
+def test_cloud_containment_nsg_invalid_direction():
+    """Test NSG rule with invalid direction fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "nsg_rules": {
+            "vnet-hub/snet-gateway": [
+                {"name": "BadDirection", "priority": 100, "direction": "Both", "access": "Allow", "protocol": "Tcp"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid NSG Direction", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.nsg_invalid_direction" for i in report.issues)
+
+
+def test_cloud_containment_nsg_missing_field():
+    """Test NSG rule missing required field fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "nsg_rules": {
+            "vnet-hub/snet-gateway": [
+                {"name": "MissingProtocol", "priority": 100, "direction": "Inbound", "access": "Allow"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Missing NSG Field", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.nsg_missing_field" for i in report.issues)
+
+
+def test_cloud_containment_route_table_valid():
+    """Test valid route table passes validation."""
+    valid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {
+                "name": "vnet-hub",
+                "subnets": [
+                    {"name": "snet-gateway", "nodes": [{"id": "fw", "label": "Firewall", "type": "compute", "ip": "10.0.0.4"}]},
+                ],
+            },
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {
+                    "name": "DefaultRoute",
+                    "address_prefix": "0.0.0.0/0",
+                    "next_hop_type": "VirtualAppliance",
+                    "next_hop_ip": "10.0.0.4",
+                },
+                {
+                    "name": "LocalVNet",
+                    "address_prefix": "10.0.0.0/16",
+                    "next_hop_type": "VnetLocal",
+                },
+            ],
+        },
+    }
+    content = DiagramContent(title="Valid Route Table", data=valid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert report.containment_compliant
+    assert report.valid
+    assert any("route_tables_valid" in r for r in report.passed_rules)
+
+
+def test_cloud_containment_route_table_invalid_subnet_reference():
+    """Test route table referencing non-existent subnet fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": []},
+        ],
+        "route_tables": {
+            "vnet-hub/non-existent": [
+                {"name": "DefaultRoute", "address_prefix": "0.0.0.0/0", "next_hop_type": "Internet"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid Route Table Subnet", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.route_table_invalid_subnet_reference" for i in report.issues)
+
+
+def test_cloud_containment_route_table_missing_field():
+    """Test route missing required field fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {"name": "MissingNextHop", "address_prefix": "0.0.0.0/0"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Missing Route Field", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.route_table_missing_field" for i in report.issues)
+
+
+def test_cloud_containment_route_table_invalid_next_hop_type():
+    """Test route with invalid next_hop_type fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {"name": "BadNextHop", "address_prefix": "0.0.0.0/0", "next_hop_type": "InvalidType"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid Next Hop", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.route_table_invalid_next_hop_type" for i in report.issues)
+
+
+def test_cloud_containment_route_table_missing_default_route_warning():
+    """Test route table without default route produces warning."""
+    valid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {
+                "name": "vnet-hub",
+                "subnets": [
+                    {"name": "snet-gateway", "nodes": [{"id": "fw", "label": "Firewall", "type": "compute", "ip": "10.0.0.4"}]},
+                ],
+            },
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {
+                    "name": "LocalVNet",
+                    "address_prefix": "10.0.0.0/16",
+                    "next_hop_type": "VnetLocal",
+                },
+            ],
+        },
+    }
+    content = DiagramContent(title="Missing Default Route", data=valid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    # Warning doesn't make containment_compliant false
+    assert report.containment_compliant
+    assert report.valid
+    assert any(i.rule == "containment.route_table_missing_default_route" and i.severity == "warning" for i in report.issues)
