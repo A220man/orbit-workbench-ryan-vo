@@ -25,7 +25,7 @@ Tests: `backend/tests/test_engine.py`, `backend/tests/test_validator.py`, `backe
 
 ### cloud-containment-grammar-azure — Advanced Azure and AWS multi-tier network topology grammar with automatic routing layout
 
-Status: in_progress
+Status: done
 
 Acceptance:
 - Automatic orthogonal routing between sibling VNets and transitive hub-spoke peering connections

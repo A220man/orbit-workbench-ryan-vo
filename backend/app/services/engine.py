@@ -203,6 +203,24 @@ body {{ margin: 0; padding: 24px; background: var(--bg); color: var(--ink); font
                       self._text(vnet_x + 30, cy + 18, snet.get("name", "Subnet"), t["ink_muted"], 10, 600, True)]
                 elems += 2
 
+                # Render NSG indicator for this subnet
+                nsg_rules = d.get("nsg_rules", {}).get(f"{vnet_name}/{snet.get('name')}", [])
+                if nsg_rules:
+                    nsg_x, nsg_y = vnet_x + 16, cy + snet_h - 24
+                    nsg_w, nsg_h = 120, 20
+                    p += [self._rect(nsg_x, nsg_y, nsg_w, nsg_h, t["accent_bg"], t["accent"], 3, f'data-azure-nsg="{vnet_name}/{snet.get("name")}"'),
+                          self._text(nsg_x + 60, nsg_y + 13, f"NSG: {len(nsg_rules)} rules", t["accent"], 8, 600, True, "middle")]
+                    elems += 2
+
+                # Render Route Table indicator for this subnet
+                route_tables = d.get("route_tables", {}).get(f"{vnet_name}/{snet.get('name')}", [])
+                if route_tables:
+                    rt_x, rt_y = vnet_x + 16, cy + snet_h - 48 if nsg_rules else cy + snet_h - 24
+                    rt_w, rt_h = 120, 20
+                    p += [self._rect(rt_x, rt_y, rt_w, rt_h, t["accent_bg"], t["accent"], 3, f'data-azure-route-table="{vnet_name}/{snet.get("name")}"'),
+                          self._text(rt_x + 60, rt_y + 13, f"RT: {len(route_tables)} routes", t["accent"], 8, 600, True, "middle")]
+                    elems += 2
+
                 nx = vnet_x + 30
                 for n in snet.get("nodes", []):
                     nw, nh, ny = 260, 48, cy + 28

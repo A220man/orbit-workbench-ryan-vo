@@ -35,7 +35,7 @@
     {
       "id": "cloud-containment-grammar-azure",
       "title": "Advanced Azure and AWS multi-tier network topology grammar with automatic routing layout",
-      "status": "in_progress",
+      "status": "done",
       "acceptance": [
         "Automatic orthogonal routing between sibling VNets and transitive hub-spoke peering connections",
         "Data-attribute validation for NSG flow rules and route tables"
