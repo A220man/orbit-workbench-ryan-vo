@@ -316,6 +316,47 @@ def test_cloud_containment_nsg_missing_field():
     assert not report.valid
     assert any(i.rule == "containment.nsg_missing_field" for i in report.issues)
 
+def test_cloud_containment_nsg_invalid_access():
+    """Test NSG rule with invalid access fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "nsg_rules": {
+            "vnet-hub/snet-gateway": [
+                {"name": "BadAccess", "priority": 100, "direction": "Inbound", "access": "Maybe", "protocol": "Tcp"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid NSG Access", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.nsg_invalid_access" for i in report.issues)
+
+
+def test_cloud_containment_nsg_invalid_protocol():
+    """Test NSG rule with invalid protocol fails validation."""
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "nsg_rules": {
+            "vnet-hub/snet-gateway": [
+                {"name": "BadProtocol", "priority": 100, "direction": "Inbound", "access": "Allow", "protocol": "Http"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Invalid NSG Protocol", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.nsg_invalid_protocol" for i in report.issues)
+
 
 def test_cloud_containment_route_table_valid():
     """Test valid route table passes validation."""
