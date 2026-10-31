@@ -35,3 +35,15 @@ Implementation: `backend/app/services/engine.py`, `backend/app/services/validato
 
 Tests: `backend/tests/test_engine.py`, `backend/tests/test_validator.py`
 
+### nsg-validation-test-coverage — Complete NSG flow rule validation test coverage for access and protocol fields
+
+Status: done
+
+Acceptance:
+- NSG rule validation rejects invalid `access` values (must be Allow or Deny)
+- NSG rule validation rejects invalid `protocol` values (must be Tcp, Udp, Icmp, or *)
+
+Implementation: `backend/tests/test_validator.py`
+
+Tests: `backend/tests/test_validator.py::test_cloud_containment_nsg_invalid_access`, `backend/tests/test_validator.py::test_cloud_containment_nsg_invalid_protocol`
+
