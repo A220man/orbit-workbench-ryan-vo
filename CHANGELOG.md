@@ -1,8 +1,23 @@
 # Changelog
 
-## 1.4.0 — work-in-progress checkpoint
+## 1.5.0 — work-in-progress checkpoint
 
 Partial code published for continued development. Known issues: STATUS.md.
+
+## 1.4.0 — work-in-progress checkpoint
+
+### Added
+- **Route Table Next Hop IP Validation**:
+  - Validates that routes with `next_hop_type` of `VirtualAppliance` or `VirtualNetworkGateway` require a `next_hop_ip` address.
+  - Prevents common Azure misconfiguration where firewall or VPN gateway routes are missing the next hop IP.
+  - New validation rule: `containment.route_table_missing_next_hop_ip`.
+- **Test Coverage**:
+  - Added test cases for missing `next_hop_ip` on VirtualAppliance and VirtualNetworkGateway routes.
+  - Added test case verifying valid routes with proper `next_hop_ip` pass validation.
+
+### Authored by
+Ryan Vo <ryandtvo@gmail.com>
+
 
 ## 1.3.0 — work-in-progress checkpoint
 
