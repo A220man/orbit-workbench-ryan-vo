@@ -4,7 +4,7 @@ Each round completes one feature or repair. Future items are planned, not implem
 
 ## Current round
 
-cloud-containment-grammar-azure
+route-table-next-hop-ip-validation
 
 ## Roadmap
 
@@ -46,4 +46,31 @@ Acceptance:
 Implementation: `backend/tests/test_validator.py`
 
 Tests: `backend/tests/test_validator.py::test_cloud_containment_nsg_invalid_access`, `backend/tests/test_validator.py::test_cloud_containment_nsg_invalid_protocol`
+
+### route-table-next-hop-ip-validation — Route table validation requires next_hop_ip for VirtualAppliance and VirtualNetworkGateway
+
+Status: done
+
+Acceptance:
+- Route table validation rejects routes with `next_hop_type` VirtualAppliance or VirtualNetworkGateway missing `next_hop_ip`
+- Validates Azure requirement that firewall and VPN gateway routes must specify the next hop IP address
+- New validation rule: `containment.route_table_missing_next_hop_ip`
+
+Implementation: `backend/app/services/validator.py`, `backend/tests/test_validator.py`
+
+Tests: `backend/tests/test_validator.py::test_cloud_containment_route_table_missing_next_hop_ip`
+
+### diagram-export-enhancements — Multi-format diagram export with CLI and programmatic API
+
+Status: planned
+
+Acceptance:
+- CLI command `orbit export` to render diagrams from saved specs or JSON files
+- Supports SVG, HTML, PNG (via headless browser), and PDF output formats
+- Batch export of multiple diagrams with configurable themes
+- Programmatic export API for integration into CI/CD pipelines
+
+Implementation: `backend/app/services/exporter.py`, `backend/app/api/export.py`, `backend/app/cli.py`
+
+Tests: `backend/tests/test_export.py`
 

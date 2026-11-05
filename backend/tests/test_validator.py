@@ -486,3 +486,61 @@ def test_cloud_containment_route_table_missing_default_route_warning():
     assert report.containment_compliant
     assert report.valid
     assert any(i.rule == "containment.route_table_missing_default_route" and i.severity == "warning" for i in report.issues)
+
+def test_cloud_containment_route_table_missing_next_hop_ip():
+    """Test route with VirtualAppliance or VirtualNetworkGateway missing next_hop_ip fails validation."""
+    # Test VirtualAppliance without next_hop_ip
+    invalid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {"name": "ToFirewall", "address_prefix": "0.0.0.0/0", "next_hop_type": "VirtualAppliance"},
+            ],
+        },
+    }
+    content = DiagramContent(title="Missing Next Hop IP", data=invalid_data)
+    report = DiagramValidator.validate("architecture_azure", content)
+    assert not report.containment_compliant
+    assert not report.valid
+    assert any(i.rule == "containment.route_table_missing_next_hop_ip" for i in report.issues)
+
+    # Test VirtualNetworkGateway without next_hop_ip
+    invalid_data_vng = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {"name": "ToVPNGateway", "address_prefix": "0.0.0.0/0", "next_hop_type": "VirtualNetworkGateway"},
+            ],
+        },
+    }
+    content_vng = DiagramContent(title="Missing Next Hop IP VNG", data=invalid_data_vng)
+    report_vng = DiagramValidator.validate("architecture_azure", content_vng)
+    assert not report_vng.containment_compliant
+    assert not report_vng.valid
+    assert any(i.rule == "containment.route_table_missing_next_hop_ip" for i in report_vng.issues)
+
+    # Test that VirtualAppliance WITH next_hop_ip passes
+    valid_data = {
+        "subscription": "Enterprise Sub",
+        "resource_group": "Core RG",
+        "vnets": [
+            {"name": "vnet-hub", "subnets": [{"name": "snet-gateway", "nodes": []}]},
+        ],
+        "route_tables": {
+            "vnet-hub/snet-gateway": [
+                {"name": "ToFirewall", "address_prefix": "0.0.0.0/0", "next_hop_type": "VirtualAppliance", "next_hop_ip": "10.0.0.4"},
+            ],
+        },
+    }
+    content_valid = DiagramContent(title="Valid Next Hop", data=valid_data)
+    report_valid = DiagramValidator.validate("architecture_azure", content_valid)
+    assert report_valid.valid
+    assert any("route_tables_valid" in r for r in report_valid.passed_rules)

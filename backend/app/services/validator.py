@@ -350,6 +350,19 @@ class DiagramValidator:
                         )
                         valid = False
 
+                # Validate next_hop_ip requirement for VirtualAppliance and VirtualNetworkGateway
+                if route.get("next_hop_type") in ("VirtualAppliance", "VirtualNetworkGateway"):
+                    if not route.get("next_hop_ip"):
+                        issues.append(
+                            ValidationIssue(
+                                rule="containment.route_table_missing_next_hop_ip",
+                                severity="error",
+                                message=f"Route '{route.get('name')}' in subnet '{subnet_ref}' has next_hop_type '{route.get('next_hop_type')}' which requires next_hop_ip.",
+                                element_id=f"rt-{subnet_ref}-{route.get('name')}",
+                            )
+                        )
+                        valid = False
+
                 valid_next_hop_types = ("VirtualAppliance", "VirtualNetworkGateway", "VnetLocal", "Internet", "None")
                 if route.get("next_hop_type") not in valid_next_hop_types:
                     issues.append(
