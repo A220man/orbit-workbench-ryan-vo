@@ -2,7 +2,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.audit import router as audit_router
+from app.api.export import router as export_router
 from app.api.auth import router as auth_router
 from app.api.diagrams import router as diagrams_router
 from app.api.evaluation import router as evaluation_router
@@ -50,7 +50,7 @@ def create_app() -> FastAPI:
 
     # Mount API routers
     application.include_router(diagrams_router, prefix="/api")
-    application.include_router(evaluation_router, prefix="/api")
+    application.include_router(export_router, prefix="/api")
     application.include_router(auth_router, prefix="/api")
     application.include_router(audit_router, prefix="/api")
 
