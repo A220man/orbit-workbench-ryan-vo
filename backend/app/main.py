@@ -6,6 +6,7 @@ from app.api.export import router as export_router
 from app.api.auth import router as auth_router
 from app.api.diagrams import router as diagrams_router
 from app.api.evaluation import router as evaluation_router
+from app.api.audit import router as audit_router
 from app.core.config import settings
 from app.core.database import init_db
 
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     application.include_router(diagrams_router, prefix="/api")
     application.include_router(export_router, prefix="/api")
     application.include_router(auth_router, prefix="/api")
+    application.include_router(evaluation_router, prefix="/api")
     application.include_router(audit_router, prefix="/api")
 
     return application
