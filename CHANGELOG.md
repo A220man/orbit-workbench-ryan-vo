@@ -1,16 +1,20 @@
 # Changelog
 
-## 1.7.0 — work-in-progress checkpoint
+## 1.8.0 — work-in-progress checkpoint
 
 Partial code published for continued development. Known issues: STATUS.md.
+
+## 1.7.0 — work-in-progress checkpoint
+
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 ## 1.6.0 — work-in-progress checkpoint
 
-Partial code published for continued development. Known issues: STATUS.md.
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 ## 1.5.0 — work-in-progress checkpoint
 
-Partial code published for continued development. Known issues: STATUS.md.
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 ## 1.4.0 — work-in-progress checkpoint
 
@@ -29,11 +33,11 @@ Ryan Vo <ryandtvo@gmail.com>
 
 ## 1.3.0 — work-in-progress checkpoint
 
-Partial code published for continued development. Known issues: STATUS.md.
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 ## 1.2.0 — work-in-progress checkpoint
 
-Partial code published for continued development. Known issues: STATUS.md.
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 ## [1.2.1] - 2026-10-24
 
@@ -60,11 +64,11 @@ Ryan Vo <ryandtvo@gmail.com>
 ## 1.2.0 — work-in-progress checkpoint
 ## 1.1.0 — work-in-progress checkpoint
 
-Partial code published for continued development. Known issues: STATUS.md.
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 ## 1.0.0 — work-in-progress checkpoint
 
-Partial code published for continued development. Known issues: STATUS.md.
+Partial code published for continued development. Known issues: none. (imports fixed).
 
 All notable changes to this project will be documented in this file.
 
