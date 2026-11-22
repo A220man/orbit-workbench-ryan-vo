@@ -133,6 +133,7 @@ body {{ margin: 0; padding: 24px; background: var(--bg); color: var(--ink); font
         p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="100%" height="auto">',
              self._rect(0, 0, w, h, t["bg"]),
              self._rect(20, 20, w - 40, h - 40, t["zone_l0"], t["border"], 6),
+             self._text(36, 30, html.escape(content.eyebrow or "", t["accent"], 11, 600, True)) if content.eyebrow else \
              self._text(36, 44, f"{pname} TENANT / {sub_t}", t["accent"], 11, 600, True),
              self._text(36, 58, rg_t, t["ink"], 11, 400, True)]
         elems += 5
